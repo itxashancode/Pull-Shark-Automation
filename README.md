@@ -5,7 +5,7 @@
 <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=180&section=header&text=Pull%20Shark%20Automation&fontSize=42&fontAlignY=30&animation=twinkling&fontColor=fff" width="100%"/>
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=22&duration=3000&pause=1000&color=36BCF7&center=true&vCenter=true&width=600&lines=🦈+Automate+Your+GitHub+PRs;⚡+Sequential+%26+Parallel+Modes;🔄+Multi-Token+Management;🌐+Smart+Proxy+Rotation;🎯+Earn+Pull+Shark+Badge" alt="Typing Animation" />
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=22&duration=3000&pause=1000&color=36BCF7&center=true&vCenter=true&width=600&lines=Automate+Your+GitHub+PRs;Sequential+%26+Parallel+Modes;Multi-Token+Management;Smart+Proxy+Rotation;Earn+Pull+Shark+Badge" alt="Typing Animation" />
 </p>
 
 <p align="center">
