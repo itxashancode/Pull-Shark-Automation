@@ -1,0 +1,318 @@
+name: Pull Shark Automation
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Execution mode"
+        required: true
+        default: "sequential"
+        type: choice
+        options:
+          - sequential
+          - parallel
+      pr_count:
+        description: "Number of PRs to create"
+        required: true
+        default: "20"
+        type: string
+      concurrent_workers:
+        description: "Parallel workers (parallel mode only)"
+        required: false
+        default: "10"
+        type: string
+      delay_seconds:
+        description: "Delay between PRs in seconds (sequential mode only)"
+        required: false
+        default: "15"
+        type: string
+      dry_run:
+        description: "Enable dry run (no actual commits)"
+        required: false
+        default: false
+        type: boolean
+      auto_merge:
+        description: "Auto-merge created PRs"
+        required: false
+        default: true
+        type: boolean
+
+  schedule:
+    # Optional: run on a schedule (uncomment to enable)
+    # - cron: "0 9 * * 1"  # Every Monday at 9 AM UTC
+    - cron: "0 0 31 2 *"   # Never (placeholder — remove to use schedule above)
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  # ──────────────────────────────────────────────
+  # JOB 1: Setup & validate environment
+  # ──────────────────────────────────────────────
+  setup:
+    name: 🔧 Setup Environment
+    runs-on: ubuntu-latest
+
+    outputs:
+      mode: ${{ steps.params.outputs.mode }}
+      pr_count: ${{ steps.params.outputs.pr_count }}
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 🔐 Authenticate GitHub CLI
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+          gh auth status
+
+      - name: ✅ Validate parameters
+        id: params
+        run: |
+          MODE="${{ github.event.inputs.mode || 'sequential' }}"
+          COUNT="${{ github.event.inputs.pr_count || '20' }}"
+
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
+          echo "pr_count=$COUNT" >> $GITHUB_OUTPUT
+
+          echo "▶ Mode:     $MODE"
+          echo "▶ PR Count: $COUNT"
+          echo "▶ Dry Run:  ${{ github.event.inputs.dry_run }}"
+
+      - name: ⚙️ Write config.json
+        run: |
+          cat > config.json <<EOF
+          {
+            "repo_path": ".",
+            "base_branch": "main",
+            "readme_file": "README.md",
+            "pr_count": ${{ github.event.inputs.pr_count || 20 }},
+            "delay_seconds": ${{ github.event.inputs.delay_seconds || 15 }},
+            "auto_merge": ${{ github.event.inputs.auto_merge || true }},
+            "dry_run": ${{ github.event.inputs.dry_run || false }},
+            "max_retries": 3,
+            "use_free_proxies": false,
+            "max_concurrent": ${{ github.event.inputs.concurrent_workers || 10 }},
+            "discord_webhook": "${{ secrets.DISCORD_WEBHOOK }}",
+            "slack_webhook": "${{ secrets.SLACK_WEBHOOK }}"
+          }
+          EOF
+          echo "✅ config.json written"
+          cat config.json
+
+      - name: 🔑 Write github_tokens.json
+        run: |
+          cat > github_tokens.json <<EOF
+          {
+            "tokens": [
+              {
+                "name": "Primary",
+                "token": "${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}"
+              }
+            ]
+          }
+          EOF
+          echo "✅ github_tokens.json written"
+
+  # ──────────────────────────────────────────────
+  # JOB 2: Sequential Mode
+  # ──────────────────────────────────────────────
+  run-sequential:
+    name: 📝 Sequential Automation
+    runs-on: ubuntu-latest
+    needs: setup
+    if: ${{ needs.setup.outputs.mode == 'sequential' }}
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: 🔐 Authenticate GitHub CLI
+        run: echo "${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: ⚙️ Restore config files
+        run: |
+          cat > config.json <<EOF
+          {
+            "repo_path": ".",
+            "base_branch": "main",
+            "readme_file": "README.md",
+            "pr_count": ${{ github.event.inputs.pr_count || 20 }},
+            "delay_seconds": ${{ github.event.inputs.delay_seconds || 15 }},
+            "auto_merge": ${{ github.event.inputs.auto_merge || true }},
+            "dry_run": ${{ github.event.inputs.dry_run || false }},
+            "max_retries": 3,
+            "use_free_proxies": false,
+            "max_concurrent": 10,
+            "discord_webhook": "${{ secrets.DISCORD_WEBHOOK }}",
+            "slack_webhook": "${{ secrets.SLACK_WEBHOOK }}"
+          }
+          EOF
+
+          cat > github_tokens.json <<EOF
+          {
+            "tokens": [
+              { "name": "Primary", "token": "${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}" }
+            ]
+          }
+          EOF
+
+      - name: 🚀 Run sequential automation
+        run: |
+          git config --global user.email "automation@github-actions.com"
+          git config --global user.name "Pull Shark Bot"
+
+          ARGS="--count ${{ github.event.inputs.pr_count || 20 }}"
+          ARGS="$ARGS --delay ${{ github.event.inputs.delay_seconds || 15 }}"
+
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          if [[ "${{ github.event.inputs.auto_merge }}" == "false" ]]; then
+            ARGS="$ARGS --no-merge"
+          fi
+
+          echo "▶ Running: python main.py $ARGS"
+          python main.py $ARGS
+
+      - name: 📊 Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sequential-logs
+          path: "*.log"
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # JOB 3: Parallel Mode
+  # ──────────────────────────────────────────────
+  run-parallel:
+    name: ⚡ Parallel Automation
+    runs-on: ubuntu-latest
+    needs: setup
+    if: ${{ needs.setup.outputs.mode == 'parallel' }}
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🔐 Authenticate GitHub CLI
+        run: echo "${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+      - name: ⚙️ Restore config files
+        run: |
+          cat > config.json <<EOF
+          {
+            "repo_path": ".",
+            "base_branch": "main",
+            "readme_file": "README.md",
+            "pr_count": ${{ github.event.inputs.pr_count || 20 }},
+            "delay_seconds": 5,
+            "auto_merge": ${{ github.event.inputs.auto_merge || true }},
+            "dry_run": ${{ github.event.inputs.dry_run || false }},
+            "max_retries": 3,
+            "use_free_proxies": false,
+            "max_concurrent": ${{ github.event.inputs.concurrent_workers || 10 }},
+            "discord_webhook": "${{ secrets.DISCORD_WEBHOOK }}",
+            "slack_webhook": "${{ secrets.SLACK_WEBHOOK }}"
+          }
+          EOF
+
+          # Build token list — add GH_TOKEN_2 / GH_TOKEN_3 as repo secrets for rotation
+          TOKENS="[ { \"name\": \"Primary\", \"token\": \"${{ secrets.GH_TOKEN_PRIMARY || secrets.GITHUB_TOKEN }}\" }"
+          if [[ -n "${{ secrets.GH_TOKEN_2 }}" ]]; then
+            TOKENS="$TOKENS, { \"name\": \"Secondary\", \"token\": \"${{ secrets.GH_TOKEN_2 }}\" }"
+          fi
+          if [[ -n "${{ secrets.GH_TOKEN_3 }}" ]]; then
+            TOKENS="$TOKENS, { \"name\": \"Tertiary\", \"token\": \"${{ secrets.GH_TOKEN_3 }}\" }"
+          fi
+          TOKENS="$TOKENS ]"
+
+          echo "{ \"tokens\": $TOKENS }" > github_tokens.json
+          echo "✅ Token file written"
+
+      - name: ⚡ Run parallel automation
+        run: |
+          git config --global user.email "automation@github-actions.com"
+          git config --global user.name "Pull Shark Bot"
+
+          ARGS="--count ${{ github.event.inputs.pr_count || 20 }}"
+          ARGS="$ARGS --concurrent ${{ github.event.inputs.concurrent_workers || 10 }}"
+
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "▶ Running: python parallel_automation.py $ARGS"
+          python parallel_automation.py $ARGS
+
+      - name: 📊 Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parallel-logs
+          path: "*.log"
+          retention-days: 7
+
+  # ──────────────────────────────────────────────
+  # JOB 4: Post-run summary
+  # ──────────────────────────────────────────────
+  summary:
+    name: 📋 Job Summary
+    runs-on: ubuntu-latest
+    needs: [run-sequential, run-parallel]
+    if: always()
+
+    steps:
+      - name: 🗒️ Write job summary
+        run: |
+          echo "## 🦈 Pull Shark Automation — Run Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Parameter | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Mode | \`${{ github.event.inputs.mode || 'sequential' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| PR Count | \`${{ github.event.inputs.pr_count || '20' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Auto Merge | \`${{ github.event.inputs.auto_merge || 'true' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Dry Run | \`${{ github.event.inputs.dry_run || 'false' }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Triggered by | \`${{ github.actor }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Workflow Run | [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "> Logs are available as artifacts in this workflow run." >> $GITHUB_STEP_SUMMARY
