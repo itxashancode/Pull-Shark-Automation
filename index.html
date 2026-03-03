@@ -7,832 +7,1152 @@
   <meta name="description" content="Automate GitHub Pull Request creation at scale with intelligent token rotation, proxy support, and real-time notifications. Earn the Pull Shark badge effortlessly." />
   <meta name="keywords" content="Pull Shark, GitHub automation, PR automation, GitHub badge, Python automation, auto merge, token rotation" />
   <link rel="canonical" href="https://itxashancode.github.io/Pull-Shark-Automation/" />
-
-  <!-- Open Graph -->
   <meta property="og:title" content="Pull Shark Automation" />
   <meta property="og:description" content="Create thousands of GitHub PRs effortlessly. Sequential & parallel modes, 62 PRs/min." />
   <meta property="og:url" content="https://itxashancode.github.io/Pull-Shark-Automation/" />
   <meta property="og:type" content="website" />
 
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <!-- FONTS -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- AOS – Scroll Animations -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.css" />
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <!-- Highlight.js Syntax Theme -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark-dimmed.min.css" />
+  <!-- Tippy Tooltips -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tippy.js/6.3.7/tippy.min.css" />
 
   <style>
+    /* ═══════════════════════════════
+       TOKENS
+    ═══════════════════════════════ */
     :root {
-      --bg: #050a0f;
-      --surface: #0a1520;
-      --border: #1a2d40;
-      --accent: #00d4ff;
-      --accent2: #0077ff;
-      --shark: #00ffaa;
-      --text: #e8f4ff;
-      --muted: #6a8aa0;
-      --danger: #ff4466;
+      --bg0:      #020b12;
+      --bg1:      #061420;
+      --bg2:      #0a1e2e;
+      --card:     #0c2033;
+      --border:   rgba(0,195,255,0.09);
+      --borderH:  rgba(0,195,255,0.28);
+
+      --cyan:     #00c3ff;
+      --cyanDim:  rgba(0,195,255,0.12);
+      --green:    #00ffaa;
+      --greenDim: rgba(0,255,170,0.10);
+      --gold:     #ffc947;
+      --goldDim:  rgba(255,201,71,0.12);
+
+      --t1: #dff3ff;
+      --t2: #7aafc8;
+      --t3: #3d6880;
+
+      --r4:  4px;
+      --r8:  8px;
+      --r12: 12px;
+      --r20: 20px;
+
+      --mono:    'JetBrains Mono', monospace;
+      --sans:    'Outfit', sans-serif;
+      --nav:     66px;
+      --wrap:    1140px;
+      --gap:     110px;
     }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ═══════════════════════════════
+       RESET
+    ═══════════════════════════════ */
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+    html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;}
+    body{background:var(--bg0);color:var(--t1);font-family:var(--sans);font-size:16px;line-height:1.6;overflow-x:hidden;}
+    img,svg{display:block;max-width:100%;}
+    a{text-decoration:none;color:inherit;}
+    button{cursor:pointer;font-family:inherit;border:none;background:none;}
+    ul{list-style:none;}
 
-    html { scroll-behavior: smooth; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Syne', sans-serif;
-      overflow-x: hidden;
-    }
-
-    /* ── GRID BACKGROUND ── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
+    /* ═══════════════════════════════
+       BACKGROUND
+    ═══════════════════════════════ */
+    #cnv{position:fixed;inset:0;z-index:0;pointer-events:none;}
+    .grid-bg{
+      position:fixed;inset:0;z-index:0;pointer-events:none;
       background-image:
-        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
-      background-size: 40px 40px;
-      pointer-events: none;
-      z-index: 0;
+        linear-gradient(rgba(0,195,255,.022) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,195,255,.022) 1px,transparent 1px);
+      background-size:46px 46px;
     }
 
-    /* ── NOISE OVERLAY ── */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.4;
+    /* ═══════════════════════════════
+       LAYOUT
+    ═══════════════════════════════ */
+    .wrap{width:100%;max-width:var(--wrap);margin:0 auto;padding:0 24px;}
+    .sec{padding:var(--gap) 0;position:relative;z-index:1;}
+
+    .sec-tag{
+      display:inline-flex;align-items:center;gap:8px;
+      font-family:var(--mono);font-size:.7rem;
+      color:var(--cyan);letter-spacing:.18em;text-transform:uppercase;
+      margin-bottom:14px;
+    }
+    .sec-tag::before{content:'';width:22px;height:1px;background:var(--cyan);opacity:.6;}
+
+    h2.sec-h{
+      font-size:clamp(1.85rem,4vw,2.75rem);font-weight:800;
+      letter-spacing:-.025em;line-height:1.12;
+      color:var(--t1);margin-bottom:12px;
+    }
+    .sec-p{font-size:1.02rem;color:var(--t2);max-width:510px;line-height:1.78;margin-bottom:52px;}
+
+    /* ═══════════════════════════════
+       PROGRESS BAR
+    ═══════════════════════════════ */
+    #prog{
+      position:fixed;top:0;left:0;height:2px;
+      background:linear-gradient(90deg,var(--cyan),var(--green));
+      z-index:1100;width:0%;transition:width .1s linear;
     }
 
-    /* ── NAV ── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 1.2rem 3rem;
-      border-bottom: 1px solid var(--border);
-      background: rgba(5,10,15,0.85);
-      backdrop-filter: blur(16px);
+    /* ═══════════════════════════════
+       NAV
+    ═══════════════════════════════ */
+    #nav{
+      position:fixed;top:0;left:0;right:0;z-index:900;
+      height:var(--nav);display:flex;align-items:center;
+      background:rgba(2,11,18,.82);
+      backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+      border-bottom:1px solid var(--border);
+      transition:background .3s,box-shadow .3s;
+    }
+    #nav.scrolled{background:rgba(2,11,18,.96);box-shadow:0 4px 36px rgba(0,0,0,.55);}
+
+    .nav-in{
+      display:flex;align-items:center;justify-content:space-between;
+      width:100%;max-width:var(--wrap);margin:0 auto;padding:0 24px;
     }
 
-    .nav-logo {
-      font-family: 'Space Mono', monospace;
-      font-size: 1rem;
-      color: var(--accent);
-      text-decoration: none;
-      letter-spacing: 0.05em;
+    .n-logo{
+      display:flex;align-items:center;gap:10px;
+      font-family:var(--mono);font-size:.92rem;font-weight:700;color:var(--t1);
+    }
+    .n-logo .hi{color:var(--cyan);}
+    .ldot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2.2s ease infinite;}
+    @keyframes blink{0%,100%{opacity:1;}50%{opacity:.15;}}
+
+    .n-links{display:flex;align-items:center;gap:28px;}
+    .n-links a{
+      font-size:.875rem;font-weight:500;color:var(--t2);
+      letter-spacing:.02em;transition:color .2s;position:relative;
+    }
+    .n-links a::after{
+      content:'';position:absolute;bottom:-2px;left:0;right:0;
+      height:1px;background:var(--cyan);
+      transform:scaleX(0);transform-origin:left;transition:transform .22s ease;
+    }
+    .n-links a:hover{color:var(--cyan);}
+    .n-links a:hover::after{transform:scaleX(1);}
+
+    .n-cta{
+      display:flex;align-items:center;gap:7px;
+      padding:8px 18px;background:var(--cyan);color:var(--bg0) !important;
+      border-radius:var(--r4);font-weight:700;font-size:.83rem;
+      transition:background .2s,transform .2s,box-shadow .2s;
+    }
+    .n-cta::after{display:none !important;}
+    .n-cta:hover{background:var(--green);transform:translateY(-1px);box-shadow:0 4px 18px rgba(0,255,170,.25);color:var(--bg0) !important;}
+
+    /* Hamburger */
+    .ham{display:none;flex-direction:column;gap:5px;padding:4px;}
+    .ham span{display:block;width:23px;height:2px;background:var(--t1);border-radius:2px;transition:transform .28s,opacity .28s;}
+    .ham.on span:nth-child(1){transform:translateY(7px) rotate(45deg);}
+    .ham.on span:nth-child(2){opacity:0;}
+    .ham.on span:nth-child(3){transform:translateY(-7px) rotate(-45deg);}
+
+    /* Mobile drawer */
+    .mob-nav{
+      display:none;position:fixed;top:var(--nav);left:0;right:0;
+      background:rgba(6,20,32,.97);backdrop-filter:blur(20px);
+      border-bottom:1px solid var(--border);
+      padding:16px 24px 24px;z-index:899;
+      flex-direction:column;gap:2px;
+    }
+    .mob-nav.on{display:flex;}
+    .mob-nav a{
+      padding:11px 14px;border-radius:var(--r8);
+      font-size:.93rem;color:var(--t2);transition:background .2s,color .2s;
+    }
+    .mob-nav a:hover{background:var(--cyanDim);color:var(--cyan);}
+    .mob-nav .n-cta{margin-top:10px;justify-content:center;padding:12px;}
+
+    /* ═══════════════════════════════
+       HERO
+    ═══════════════════════════════ */
+    #hero{
+      position:relative;z-index:1;
+      min-height:100vh;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;text-align:center;
+      padding:calc(var(--nav) + 70px) 24px 80px;overflow:hidden;
+    }
+    .h-glow1{
+      position:absolute;top:0;left:50%;transform:translateX(-50%);
+      width:860px;height:560px;pointer-events:none;
+      background:radial-gradient(ellipse at 50% 0%,rgba(0,195,255,.09) 0%,transparent 65%);
+    }
+    .h-glow2{
+      position:absolute;bottom:-60px;left:28%;
+      width:460px;height:460px;pointer-events:none;
+      background:radial-gradient(circle,rgba(0,255,170,.055) 0%,transparent 65%);
+    }
+    .h-chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 18px;border:1px solid var(--borderH);border-radius:999px;
+      background:var(--cyanDim);
+      font-family:var(--mono);font-size:.7rem;color:var(--cyan);
+      letter-spacing:.1em;text-transform:uppercase;margin-bottom:28px;
+    }
+    .h1{
+      font-family:var(--sans);font-weight:800;
+      font-size:clamp(2.7rem,8.5vw,6rem);
+      letter-spacing:-.032em;line-height:1.0;margin-bottom:22px;
+    }
+    .h1 .l1{display:block;color:var(--t1);}
+    .h1 .l2{display:block;}
+    .grad{
+      background:linear-gradient(130deg,var(--cyan) 0%,var(--green) 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+    }
+    .h-sub{
+      font-size:clamp(.98rem,2vw,1.18rem);color:var(--t2);
+      max-width:560px;line-height:1.76;margin:0 auto 38px;
+    }
+    .h-sub strong{color:var(--cyan);}
+    .h-btns{display:flex;gap:13px;flex-wrap:wrap;justify-content:center;margin-bottom:64px;}
+
+    /* ─ Buttons ─ */
+    .btn{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:12px 26px;border-radius:var(--r4);
+      font-family:var(--mono);font-size:.8rem;font-weight:500;
+      letter-spacing:.03em;transition:all .22s ease;white-space:nowrap;
+    }
+    .btn-p{background:var(--cyan);color:var(--bg0);border:none;}
+    .btn-p:hover{background:var(--green);transform:translateY(-2px);box-shadow:0 8px 28px rgba(0,255,170,.3);}
+    .btn-g{background:transparent;color:var(--t1);border:1px solid var(--borderH);}
+    .btn-g:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyanDim);transform:translateY(-2px);}
+    .btn-gold{background:var(--gold);color:#1a0c00;border:none;}
+    .btn-gold:hover{background:#ffd776;transform:translateY(-2px);box-shadow:0 8px 28px rgba(255,201,71,.3);}
+
+    /* Tags */
+    .h-tags{display:flex;gap:9px;flex-wrap:wrap;justify-content:center;}
+    .tag{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:5px 12px;border:1px solid var(--border);border-radius:999px;
+      font-family:var(--mono);font-size:.68rem;color:var(--t3);
+      transition:border-color .2s,color .2s;
+    }
+    .tag:hover{border-color:var(--borderH);color:var(--t2);}
+
+    /* ═══════════════════════════════
+       STATS
+    ═══════════════════════════════ */
+    #stats{
+      position:relative;z-index:1;
+      border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+      background:rgba(9,20,30,.72);backdrop-filter:blur(14px);
+    }
+    .stats-g{display:grid;grid-template-columns:repeat(5,1fr);}
+    .s-item{
+      padding:34px 20px;text-align:center;
+      border-right:1px solid var(--border);position:relative;overflow:hidden;
+    }
+    .s-item:last-child{border-right:none;}
+    .s-item::after{
+      content:'';position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+      width:55%;height:1px;
+      background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+      opacity:0;transition:opacity .3s;
+    }
+    .s-item:hover::after{opacity:1;}
+    .s-num{
+      font-family:var(--mono);font-size:clamp(1.5rem,3vw,2.1rem);font-weight:700;
+      color:var(--cyan);display:block;line-height:1;margin-bottom:5px;letter-spacing:-.02em;
+    }
+    .s-lbl{font-size:.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;}
+
+    /* ═══════════════════════════════
+       FEATURES
+    ═══════════════════════════════ */
+    .feat-g{
+      display:grid;grid-template-columns:repeat(3,1fr);
+      gap:1px;background:var(--border);
+      border:1px solid var(--border);border-radius:var(--r20);overflow:hidden;
+    }
+    .f-card{
+      background:var(--card);padding:30px;
+      position:relative;overflow:hidden;transition:background .22s;
+    }
+    .f-card::before{
+      content:'';position:absolute;top:0;left:0;width:100%;height:2px;
+      background:linear-gradient(90deg,transparent,var(--cyan),transparent);
+      opacity:0;transition:opacity .3s;
+    }
+    .f-card:hover{background:#0e2235;}
+    .f-card:hover::before{opacity:1;}
+    .f-ico{
+      width:42px;height:42px;border-radius:var(--r4);
+      background:var(--cyanDim);border:1px solid rgba(0,195,255,.18);
+      display:flex;align-items:center;justify-content:center;
+      font-size:1.05rem;color:var(--cyan);margin-bottom:18px;
+      transition:background .2s,border-color .2s;
+    }
+    .f-card:hover .f-ico{background:rgba(0,195,255,.2);border-color:rgba(0,195,255,.38);}
+    .f-title{font-size:.96rem;font-weight:700;color:var(--t1);margin-bottom:7px;letter-spacing:-.01em;}
+    .f-desc{font-size:.855rem;color:var(--t2);line-height:1.64;}
+
+    /* ═══════════════════════════════
+       BADGES
+    ═══════════════════════════════ */
+    .badge-g{display:grid;grid-template-columns:repeat(4,1fr);gap:15px;}
+    .b-card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--r12);padding:30px 22px;text-align:center;
+      position:relative;overflow:hidden;
+      transition:transform .25s,border-color .25s,box-shadow .25s;
+    }
+    .b-card:hover{transform:translateY(-6px);}
+    .b-card.def:hover  {border-color:rgba(138,173,204,.45);box-shadow:0 16px 40px rgba(138,173,204,.1);}
+    .b-card.bro:hover  {border-color:rgba(205,127,50,.45); box-shadow:0 16px 40px rgba(205,127,50,.15);}
+    .b-card.sil:hover  {border-color:rgba(192,192,192,.45);box-shadow:0 16px 40px rgba(192,192,192,.15);}
+    .b-card.gol:hover  {border-color:rgba(255,201,71,.55); box-shadow:0 16px 40px rgba(255,201,71,.2);}
+    .b-glow{
+      position:absolute;top:-40px;left:50%;transform:translateX(-50%);
+      width:110px;height:110px;border-radius:50%;opacity:.08;
+    }
+    .b-card.def .b-glow{background:#8aadcc;}
+    .b-card.bro .b-glow{background:#cd7f32;}
+    .b-card.sil .b-glow{background:#c0c0c0;}
+    .b-card.gol .b-glow{background:#ffc947;}
+    .b-tier{
+      font-family:var(--mono);font-size:.67rem;letter-spacing:.16em;
+      text-transform:uppercase;margin-bottom:15px;
+    }
+    .b-card.def .b-tier{color:#8aadcc;}
+    .b-card.bro .b-tier{color:#cd7f32;}
+    .b-card.sil .b-tier{color:#c0c0c0;}
+    .b-card.gol .b-tier{color:var(--gold);}
+    .b-emoji{font-size:2.8rem;display:block;margin-bottom:14px;line-height:1;}
+    .b-num{font-family:var(--mono);font-size:2rem;font-weight:700;line-height:1;margin-bottom:4px;}
+    .b-card.def .b-num{color:#8aadcc;}
+    .b-card.bro .b-num{color:#cd7f32;}
+    .b-card.sil .b-num{color:#c0c0c0;}
+    .b-card.gol .b-num{color:var(--gold);}
+    .b-unit{font-size:.75rem;color:var(--t3);letter-spacing:.06em;}
+
+    /* ═══════════════════════════════
+       USAGE / CODE
+    ═══════════════════════════════ */
+    .code-lay{display:grid;grid-template-columns:1fr 1.35fr;gap:44px;align-items:start;}
+
+    .c-tabs{
+      display:flex;gap:3px;padding:4px;
+      background:rgba(0,0,0,.3);
+      border-radius:var(--r4) var(--r4) 0 0;
+    }
+    .c-tab{
+      flex:1;padding:8px 14px;border-radius:3px;
+      font-family:var(--mono);font-size:.7rem;color:var(--t3);
+      background:transparent;transition:background .2s,color .2s;
+      letter-spacing:.04em;
+    }
+    .c-tab.on{background:rgba(0,195,255,.12);color:var(--cyan);}
+    .c-tab:hover:not(.on){color:var(--t2);background:rgba(255,255,255,.04);}
+
+    .c-win{
+      background:#0c1d2a;border:1px solid var(--border);
+      border-radius:0 0 var(--r12) var(--r12);overflow:hidden;
+    }
+    .c-bar{
+      display:flex;align-items:center;gap:7px;
+      padding:9px 15px;background:rgba(0,0,0,.25);border-bottom:1px solid var(--border);
+    }
+    .dm{width:11px;height:11px;border-radius:50%;}
+    .dm-r{background:#ff5f57;}.dm-y{background:#ffbd2e;}.dm-g{background:#28c941;}
+    .c-fname{font-family:var(--mono);font-size:.7rem;color:var(--t3);margin-left:6px;}
+    .c-panel{display:none;}
+    .c-panel.on{display:block;}
+    .c-win pre{padding:18px 22px;font-size:.77rem;line-height:1.8;overflow-x:auto;}
+    .c-win pre code{font-family:var(--mono) !important;}
+    .hljs{background:transparent !important;}
+
+    .info-col{display:flex;flex-direction:column;gap:14px;}
+    .i-card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--r12);padding:18px 22px;
+      display:flex;gap:15px;align-items:flex-start;
+      transition:border-color .2s;
+    }
+    .i-card:hover{border-color:var(--borderH);}
+    .i-ico{
+      width:36px;height:36px;border-radius:var(--r4);
+      display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;
+    }
+    .i-ico.c{background:var(--cyanDim);color:var(--cyan);border:1px solid rgba(0,195,255,.18);}
+    .i-ico.g{background:var(--greenDim);color:var(--green);border:1px solid rgba(0,255,170,.18);}
+    .i-ico.gd{background:var(--goldDim);color:var(--gold);border:1px solid rgba(255,201,71,.18);}
+    .i-card h4{font-size:.88rem;font-weight:700;margin-bottom:3px;}
+    .i-card p{font-size:.8rem;color:var(--t2);line-height:1.55;}
+
+    /* ═══════════════════════════════
+       INSTALL
+    ═══════════════════════════════ */
+    .inst-lay{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:start;}
+
+    .steps{display:flex;flex-direction:column;gap:3px;}
+    .step{
+      display:flex;gap:18px;align-items:flex-start;
+      padding:18px;border-radius:var(--r12);
+      border:1px solid transparent;cursor:pointer;
+      transition:background .2s,border-color .2s;
+    }
+    .step:hover,.step.on{background:var(--card);border-color:var(--borderH);}
+    .step.on .sn{background:var(--cyanDim);border-color:rgba(0,195,255,.38);color:var(--cyan);}
+    .sn{
+      width:30px;height:30px;border-radius:var(--r4);
+      border:1px solid var(--border);flex-shrink:0;
+      display:flex;align-items:center;justify-content:center;
+      font-family:var(--mono);font-size:.7rem;font-weight:700;color:var(--t3);
+      transition:background .2s,border-color .2s,color .2s;
+    }
+    .sb h4{font-size:.92rem;font-weight:700;margin-bottom:3px;color:var(--t1);}
+    .sb p{font-size:.81rem;color:var(--t2);line-height:1.6;}
+    .sb code{
+      font-family:var(--mono);font-size:.73rem;padding:1px 6px;
+      background:var(--cyanDim);border:1px solid rgba(0,195,255,.16);
+      border-radius:3px;color:var(--cyan);
     }
 
-    .nav-logo span { color: var(--shark); }
-
-    .nav-links { display: flex; gap: 2rem; }
-
-    .nav-links a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.85rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      transition: color 0.2s;
+    .req-card{
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--r12);overflow:hidden;
+      position:sticky;top:calc(var(--nav) + 20px);
+    }
+    .req-hd{
+      padding:14px 18px;border-bottom:1px solid var(--border);
+      display:flex;align-items:center;gap:9px;background:rgba(0,0,0,.2);
+    }
+    .req-hd h3{font-size:.86rem;font-weight:700;}
+    .req-hd i{color:var(--cyan);font-size:.88rem;}
+    .req-list{padding:6px 0;}
+    .req-row{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:9px 18px;transition:background .15s;
+    }
+    .req-row:hover{background:rgba(255,255,255,.025);}
+    .req-name{display:flex;align-items:center;gap:9px;font-size:.84rem;}
+    .req-name i{font-size:.78rem;color:var(--t3);width:15px;text-align:center;}
+    .rbadge{
+      font-family:var(--mono);font-size:.66rem;padding:2px 8px;border-radius:999px;
+      background:var(--greenDim);border:1px solid rgba(0,255,170,.18);color:var(--green);
     }
 
-    .nav-links a:hover { color: var(--accent); }
+    /* ═══════════════════════════════
+       CTA
+    ═══════════════════════════════ */
+    #cta{position:relative;z-index:1;padding:90px 24px;text-align:center;}
+    .cta-box{
+      max-width:660px;margin:0 auto;
+      background:var(--card);border:1px solid var(--border);
+      border-radius:var(--r20);padding:60px 44px;position:relative;overflow:hidden;
+    }
+    .cta-box::before{
+      content:'';position:absolute;top:-110px;left:50%;transform:translateX(-50%);
+      width:400px;height:400px;
+      background:radial-gradient(circle,rgba(0,255,170,.065) 0%,transparent 65%);
+      pointer-events:none;
+    }
+    .cta-box::after{
+      content:'';position:absolute;inset:0;border-radius:inherit;
+      background:linear-gradient(135deg,rgba(0,195,255,.035) 0%,transparent 50%,rgba(0,255,170,.035) 100%);
+      pointer-events:none;
+    }
+    .cta-shark{font-size:3.5rem;display:block;margin-bottom:18px;line-height:1;}
+    .cta-box h2{font-size:clamp(1.75rem,4vw,2.5rem);font-weight:800;letter-spacing:-.025em;margin-bottom:12px;}
+    .cta-box p{color:var(--t2);margin-bottom:32px;font-size:1rem;line-height:1.7;}
+    .cta-acts{display:flex;gap:13px;justify-content:center;flex-wrap:wrap;}
 
-    .nav-cta {
-      background: var(--accent);
-      color: var(--bg) !important;
-      padding: 0.5rem 1.2rem;
-      border-radius: 4px;
-      font-weight: 700 !important;
+    /* ═══════════════════════════════
+       FOOTER
+    ═══════════════════════════════ */
+    footer{position:relative;z-index:1;border-top:1px solid var(--border);background:rgba(6,20,32,.6);}
+    .ft-main{
+      display:grid;grid-template-columns:1.4fr 1fr 1fr;
+      gap:44px;padding:52px 0 44px;
+    }
+    .ft-brand h3{
+      font-family:var(--mono);font-size:.95rem;color:var(--t1);
+      margin-bottom:9px;display:flex;align-items:center;gap:9px;
+    }
+    .ft-brand p{font-size:.855rem;color:var(--t3);line-height:1.7;max-width:270px;}
+    .ft-col h4{
+      font-size:.75rem;font-weight:700;text-transform:uppercase;
+      letter-spacing:.12em;color:var(--t3);margin-bottom:15px;
+    }
+    .ft-col ul{display:flex;flex-direction:column;gap:9px;}
+    .ft-col a{
+      font-size:.855rem;color:var(--t2);transition:color .2s;
+      display:flex;align-items:center;gap:7px;
+    }
+    .ft-col a i{font-size:.73rem;color:var(--t3);}
+    .ft-col a:hover{color:var(--cyan);}
+    .ft-col a:hover i{color:var(--cyan);}
+    .ft-bot{
+      border-top:1px solid var(--border);padding:18px 0;
+      display:flex;align-items:center;justify-content:space-between;
+      flex-wrap:wrap;gap:10px;
+    }
+    .ft-bot span{font-family:var(--mono);font-size:.7rem;color:var(--t3);}
+    .ft-soc{display:flex;gap:10px;}
+    .soc-a{
+      width:33px;height:33px;border-radius:var(--r4);
+      border:1px solid var(--border);
+      display:flex;align-items:center;justify-content:center;
+      color:var(--t3);font-size:.82rem;
+      transition:border-color .2s,color .2s,background .2s;
+    }
+    .soc-a:hover{border-color:var(--cyan);color:var(--cyan);background:var(--cyanDim);}
+
+    /* ═══════════════════════════════
+       SCROLL TOP
+    ═══════════════════════════════ */
+    #stb{
+      position:fixed;bottom:26px;right:26px;z-index:800;
+      width:40px;height:40px;border-radius:var(--r4);
+      background:var(--card);border:1px solid var(--borderH);
+      color:var(--cyan);font-size:.88rem;
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;pointer-events:none;
+      transition:opacity .3s,transform .3s,background .2s;
+      transform:translateY(8px);
+    }
+    #stb.vis{opacity:1;pointer-events:all;transform:translateY(0);}
+    #stb:hover{background:var(--cyanDim);}
+
+    /* ═══════════════════════════════
+       DIVIDER
+    ═══════════════════════════════ */
+    .div{
+      position:relative;z-index:1;
+      border:none;height:1px;
+      background:linear-gradient(90deg,transparent,var(--border),transparent);
+      margin:0;
     }
 
-    .nav-cta:hover { background: var(--shark) !important; color: var(--bg) !important; }
-
-    /* ── HERO ── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 8rem 2rem 4rem;
-      z-index: 1;
+    /* ═══════════════════════════════
+       TIPPY
+    ═══════════════════════════════ */
+    .tippy-box[data-theme~='sh']{
+      background:var(--card);border:1px solid var(--borderH);
+      color:var(--t1);font-size:.76rem;font-family:var(--mono);
+      border-radius:var(--r4);
     }
+    .tippy-box[data-theme~='sh'] .tippy-arrow{color:var(--card);}
 
-    .hero-glow {
-      position: absolute;
-      top: 20%;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 700px;
-      height: 400px;
-      background: radial-gradient(ellipse, rgba(0,212,255,0.12) 0%, transparent 70%);
-      pointer-events: none;
+    /* ═══════════════════════════════
+       RESPONSIVE
+    ═══════════════════════════════ */
+    @media(max-width:1060px){
+      :root{--gap:86px;}
+      .feat-g{grid-template-columns:repeat(2,1fr);}
+      .badge-g{grid-template-columns:repeat(2,1fr);}
+      .stats-g{grid-template-columns:repeat(3,1fr);}
+      .s-item:nth-child(3){border-right:none;}
+      .s-item:nth-child(4){border-top:1px solid var(--border);}
+      .s-item:nth-child(5){border-top:1px solid var(--border);border-right:none;}
+      .code-lay{grid-template-columns:1fr;}
+      .inst-lay{grid-template-columns:1fr;}
+      .req-card{position:static;}
+      .ft-main{grid-template-columns:1fr 1fr;}
     }
-
-    .badge-row {
-      display: flex;
-      gap: 0.6rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 2rem;
-      animation: fadeUp 0.6s ease both;
+    @media(max-width:720px){
+      :root{--gap:64px;--nav:60px;}
+      .n-links{display:none;}
+      .ham{display:flex;}
+      .feat-g{grid-template-columns:1fr;border-radius:var(--r12);}
+      .badge-g{grid-template-columns:repeat(2,1fr);}
+      .stats-g{grid-template-columns:repeat(2,1fr);}
+      .s-item:nth-child(2){border-right:none;}
+      .s-item:nth-child(3){border-top:1px solid var(--border);}
+      .s-item:nth-child(4){border-top:1px solid var(--border);border-right:none;}
+      .s-item:nth-child(5){grid-column:span 2;border-top:1px solid var(--border);border-right:none;}
+      .ft-main{grid-template-columns:1fr;gap:28px;}
+      .ft-bot{justify-content:center;text-align:center;}
+      .cta-box{padding:40px 24px;}
     }
-
-    .badge {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.7rem;
-      padding: 0.3rem 0.8rem;
-      border-radius: 3px;
-      border: 1px solid var(--border);
-      color: var(--muted);
-      letter-spacing: 0.05em;
-    }
-
-    .badge.green { border-color: rgba(0,255,170,0.3); color: var(--shark); }
-    .badge.blue  { border-color: rgba(0,212,255,0.3); color: var(--accent); }
-
-    .hero-eyebrow {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--shark);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      margin-bottom: 1.5rem;
-      animation: fadeUp 0.7s ease both;
-    }
-
-    h1 {
-      font-size: clamp(2.8rem, 7vw, 5.5rem);
-      font-weight: 800;
-      line-height: 1.0;
-      letter-spacing: -0.03em;
-      margin-bottom: 1.5rem;
-      animation: fadeUp 0.8s ease both;
-    }
-
-    h1 .accent { color: var(--accent); }
-    h1 .shark  { color: var(--shark); }
-
-    .hero-sub {
-      font-size: 1.15rem;
-      color: var(--muted);
-      max-width: 560px;
-      line-height: 1.7;
-      margin-bottom: 3rem;
-      animation: fadeUp 0.9s ease both;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-      justify-content: center;
-      animation: fadeUp 1s ease both;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.85rem 2rem;
-      border-radius: 6px;
-      font-family: 'Space Mono', monospace;
-      font-size: 0.85rem;
-      font-weight: 700;
-      cursor: pointer;
-      text-decoration: none;
-      transition: all 0.2s;
-      letter-spacing: 0.03em;
-    }
-
-    .btn-primary {
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-    }
-
-    .btn-primary:hover {
-      background: var(--shark);
-      transform: translateY(-2px);
-      box-shadow: 0 8px 30px rgba(0,255,170,0.25);
-    }
-
-    .btn-outline {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
-    .btn-outline:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: translateY(-2px);
-    }
-
-    /* ── STATS BAR ── */
-    .stats-bar {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      justify-content: center;
-      gap: 0;
-      flex-wrap: wrap;
-      border-top: 1px solid var(--border);
-      border-bottom: 1px solid var(--border);
-      background: rgba(10,21,32,0.6);
-      margin-top: 5rem;
-    }
-
-    .stat {
-      flex: 1;
-      min-width: 160px;
-      padding: 2rem;
-      text-align: center;
-      border-right: 1px solid var(--border);
-    }
-
-    .stat:last-child { border-right: none; }
-
-    .stat-num {
-      font-family: 'Space Mono', monospace;
-      font-size: 2.2rem;
-      font-weight: 700;
-      color: var(--accent);
-      display: block;
-      line-height: 1;
-      margin-bottom: 0.4rem;
-    }
-
-    .stat-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-    }
-
-    /* ── SECTIONS ── */
-    section {
-      position: relative;
-      z-index: 1;
-      padding: 6rem 2rem;
-      max-width: 1100px;
-      margin: 0 auto;
-    }
-
-    .section-tag {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.7rem;
-      color: var(--shark);
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      margin-bottom: 1rem;
-    }
-
-    h2 {
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-bottom: 1rem;
-    }
-
-    .section-intro {
-      color: var(--muted);
-      font-size: 1.05rem;
-      line-height: 1.7;
-      max-width: 560px;
-      margin-bottom: 3.5rem;
-    }
-
-    /* ── FEATURES GRID ── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 1.5px;
-      background: var(--border);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .feature-card {
-      background: var(--surface);
-      padding: 2rem;
-      transition: background 0.2s;
-    }
-
-    .feature-card:hover { background: #0d1e2e; }
-
-    .feature-icon {
-      font-size: 1.8rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-
-    .feature-title {
-      font-size: 1rem;
-      font-weight: 700;
-      margin-bottom: 0.5rem;
-      color: var(--text);
-    }
-
-    .feature-desc {
-      font-size: 0.875rem;
-      color: var(--muted);
-      line-height: 1.6;
-    }
-
-    /* ── BADGES SECTION ── */
-    .badges-row {
-      display: flex;
-      gap: 1.5rem;
-      flex-wrap: wrap;
-    }
-
-    .badge-card {
-      flex: 1;
-      min-width: 200px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.5rem 2rem;
-      text-align: center;
-      position: relative;
-      overflow: hidden;
-      transition: transform 0.2s, border-color 0.2s;
-    }
-
-    .badge-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--accent);
-    }
-
-    .badge-card.gold { border-color: rgba(255,200,50,0.4); }
-    .badge-card.gold:hover { border-color: #ffc832; }
-
-    .badge-tier {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.7rem;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.15em;
-      margin-bottom: 0.75rem;
-    }
-
-    .badge-emoji { font-size: 2.5rem; display: block; margin-bottom: 0.75rem; }
-
-    .badge-prs {
-      font-family: 'Space Mono', monospace;
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: var(--accent);
-    }
-
-    .badge-prs-label {
-      font-size: 0.75rem;
-      color: var(--muted);
-      margin-top: 0.25rem;
-    }
-
-    /* ── CODE BLOCK ── */
-    .code-showcase {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-
-    .code-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--border);
-      background: rgba(0,0,0,0.2);
-    }
-
-    .dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot.red   { background: #ff5f57; }
-    .dot.yellow{ background: #ffbd2e; }
-    .dot.green { background: #28c941; }
-
-    .code-title {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--muted);
-      margin-left: 0.5rem;
-    }
-
-    pre {
-      padding: 2rem;
-      overflow-x: auto;
-      font-family: 'Space Mono', monospace;
-      font-size: 0.82rem;
-      line-height: 1.8;
-      color: #b0d4f0;
-    }
-
-    .c-comment { color: #3a5a70; }
-    .c-cmd     { color: var(--shark); }
-    .c-flag    { color: var(--accent); }
-    .c-str     { color: #ff9f5a; }
-    .c-num     { color: #c084fc; }
-
-    /* ── INSTALL STEPS ── */
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .step {
-      display: flex;
-      gap: 1.5rem;
-      align-items: flex-start;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1.5rem;
-      transition: border-color 0.2s;
-    }
-
-    .step:hover { border-color: var(--accent); }
-
-    .step-num {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--accent);
-      background: rgba(0,212,255,0.08);
-      border: 1px solid rgba(0,212,255,0.2);
-      width: 36px;
-      height: 36px;
-      border-radius: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-      font-weight: 700;
-    }
-
-    .step-content h4 {
-      font-weight: 700;
-      margin-bottom: 0.3rem;
-    }
-
-    .step-content p {
-      color: var(--muted);
-      font-size: 0.875rem;
-      line-height: 1.6;
-    }
-
-    .step-content code {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.78rem;
-      background: rgba(0,212,255,0.08);
-      border: 1px solid rgba(0,212,255,0.15);
-      padding: 0.15rem 0.4rem;
-      border-radius: 3px;
-      color: var(--accent);
-    }
-
-    /* ── CTA SECTION ── */
-    .cta-section {
-      text-align: center;
-      padding: 6rem 2rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    .cta-inner {
-      max-width: 640px;
-      margin: 0 auto;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 4rem 3rem;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .cta-inner::before {
-      content: '';
-      position: absolute;
-      top: -80px; left: 50%; transform: translateX(-50%);
-      width: 300px; height: 300px;
-      background: radial-gradient(circle, rgba(0,255,170,0.1) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .cta-inner h2 {
-      margin-bottom: 1rem;
-      font-size: 2.5rem;
-    }
-
-    .cta-inner p {
-      color: var(--muted);
-      margin-bottom: 2.5rem;
-      line-height: 1.7;
-    }
-
-    /* ── FOOTER ── */
-    footer {
-      position: relative;
-      z-index: 1;
-      border-top: 1px solid var(--border);
-      padding: 2rem 3rem;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: gap;
-      gap: 1rem;
-    }
-
-    footer span {
-      font-family: 'Space Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-      font-size: 0.75rem;
-      font-family: 'Space Mono', monospace;
-      transition: color 0.2s;
-    }
-
-    footer a:hover { color: var(--accent); }
-
-    .footer-links { display: flex; gap: 2rem; }
-
-    /* ── ANIMATIONS ── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(24px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes pulse-glow {
-      0%, 100% { opacity: 0.6; }
-      50%       { opacity: 1; }
-    }
-
-    .shark-icon {
-      display: inline-block;
-      animation: pulse-glow 2s ease infinite;
-    }
-
-    /* ── RESPONSIVE ── */
-    @media (max-width: 700px) {
-      nav { padding: 1rem 1.5rem; }
-      .nav-links { display: none; }
-      .stats-bar { flex-direction: column; }
-      .stat { border-right: none; border-bottom: 1px solid var(--border); }
-      .stat:last-child { border-bottom: none; }
-      footer { flex-direction: column; text-align: center; }
+    @media(max-width:460px){
+      .h1{font-size:2.3rem;}
+      .badge-g{gap:10px;}
+      .b-card{padding:22px 14px;}
+      .stats-g{grid-template-columns:1fr 1fr;}
+      .btn{padding:10px 18px;font-size:.76rem;}
     }
   </style>
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav>
-    <a href="#" class="nav-logo">🦈 pull<span>_shark</span></a>
-    <div class="nav-links">
-      <a href="#features">Features</a>
-      <a href="#badges">Badges</a>
-      <a href="#install">Install</a>
-      <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="nav-cta">GitHub ↗</a>
-    </div>
-  </nav>
+<div id="prog"></div>
+<div class="grid-bg"></div>
+<canvas id="cnv"></canvas>
 
-  <!-- HERO -->
-  <div class="hero">
-    <div class="hero-glow"></div>
-
-    <div class="badge-row">
-      <span class="badge green">Python 3.8+</span>
-      <span class="badge blue">62 PRs/min</span>
-      <span class="badge">MIT License</span>
-      <span class="badge">Windows / Linux / macOS</span>
-    </div>
-
-    <p class="hero-eyebrow">GitHub Automation Framework</p>
-
-    <h1>
-      Automate Your<br/>
-      <span class="shark">Pull Shark</span> <span class="accent">Badge</span>
-    </h1>
-
-    <p class="hero-sub">
-      Create thousands of GitHub PRs at scale with intelligent token rotation, proxy support, and real-time notifications. Sequential or blazing-fast parallel mode.
-    </p>
-
-    <div class="hero-actions">
-      <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="btn btn-primary">
-        ⭐ Star on GitHub
-      </a>
-      <a href="#install" class="btn btn-outline">
-        Quick Install →
-      </a>
-    </div>
-  </div>
-
-  <!-- STATS -->
-  <div class="stats-bar">
-    <div class="stat">
-      <span class="stat-num">62</span>
-      <span class="stat-label">PRs per Minute</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">3+</span>
-      <span class="stat-label">Token Rotation</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">15k+</span>
-      <span class="stat-label">API Req / Hour</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">4</span>
-      <span class="stat-label">Badge Tiers</span>
-    </div>
-    <div class="stat">
-      <span class="stat-num">100%</span>
-      <span class="stat-label">Open Source</span>
-    </div>
-  </div>
-
-  <!-- FEATURES -->
-  <section id="features">
-    <p class="section-tag">// capabilities</p>
-    <h2>Everything You Need</h2>
-    <p class="section-intro">A complete Python automation framework built for scale — from your first 2 PRs to 1,024+.</p>
-
-    <div class="features-grid">
-      <div class="feature-card">
-        <span class="feature-icon">⚡</span>
-        <div class="feature-title">Parallel Mode</div>
-        <div class="feature-desc">Multi-threaded async engine processes up to 62 PRs/min with 20 concurrent workers.</div>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">🔑</span>
-        <div class="feature-title">Token Rotation</div>
-        <div class="feature-desc">Automatically rotates between multiple GitHub tokens to sustain 15,000+ requests per hour.</div>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">🌐</span>
-        <div class="feature-title">Proxy Support</div>
-        <div class="feature-desc">Built-in proxy scraping, testing, and rotation keeps your requests distributed and reliable.</div>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">📢</span>
-        <div class="feature-title">Live Notifications</div>
-        <div class="feature-desc">Discord and Slack webhooks deliver real-time progress, success, and error alerts.</div>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">💾</span>
-        <div class="feature-title">State Persistence</div>
-        <div class="feature-desc">Interrupted runs resume automatically from where they left off — never lose progress.</div>
-      </div>
-      <div class="feature-card">
-        <span class="feature-icon">🧪</span>
-        <div class="feature-title">Dry Run Mode</div>
-        <div class="feature-desc">Simulate the full automation pipeline without making any real commits or PRs.</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- BADGES -->
-  <section id="badges">
-    <p class="section-tag">// achievement tiers</p>
-    <h2>Earn Every Badge</h2>
-    <p class="section-intro">From Default to Gold — automate your way through every Pull Shark tier.</p>
-
-    <div class="badges-row">
-      <div class="badge-card">
-        <div class="badge-tier">Default</div>
-        <span class="badge-emoji">🦈</span>
-        <div class="badge-prs">2</div>
-        <div class="badge-prs-label">Pull Requests</div>
-      </div>
-      <div class="badge-card">
-        <div class="badge-tier">Bronze</div>
-        <span class="badge-emoji">🥉</span>
-        <div class="badge-prs">16</div>
-        <div class="badge-prs-label">Pull Requests</div>
-      </div>
-      <div class="badge-card">
-        <div class="badge-tier">Silver</div>
-        <span class="badge-emoji">🥈</span>
-        <div class="badge-prs">128</div>
-        <div class="badge-prs-label">Pull Requests</div>
-      </div>
-      <div class="badge-card gold">
-        <div class="badge-tier">Gold</div>
-        <span class="badge-emoji">🏆</span>
-        <div class="badge-prs" style="color:#ffc832">1024</div>
-        <div class="badge-prs-label">Pull Requests</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CODE -->
-  <section id="usage">
-    <p class="section-tag">// quick commands</p>
-    <h2>Start in Seconds</h2>
-    <p class="section-intro">Three commands are all you need to go from zero to Pull Shark Gold.</p>
-
-    <div class="code-showcase">
-      <div class="code-header">
-        <div class="dot red"></div>
-        <div class="dot yellow"></div>
-        <div class="dot green"></div>
-        <span class="code-title">terminal</span>
-      </div>
-      <pre><span class="c-comment"># Clone and install</span>
-<span class="c-cmd">git</span> clone https://github.com/itxashancode/Pull-Shark-Automation.git
-<span class="c-cmd">pip</span> install <span class="c-flag">-r</span> requirements.txt
-
-<span class="c-comment"># Sequential mode (reliable, small batches)</span>
-<span class="c-cmd">python</span> main.py <span class="c-flag">--count</span> <span class="c-num">20</span> <span class="c-flag">--delay</span> <span class="c-num">15</span>
-
-<span class="c-comment"># Parallel mode (fast, large batches — Gold badge)</span>
-<span class="c-cmd">python</span> parallel_automation.py <span class="c-flag">--count</span> <span class="c-num">1024</span> <span class="c-flag">--concurrent</span> <span class="c-num">20</span>
-
-<span class="c-comment"># Test first with dry run</span>
-<span class="c-cmd">python</span> main.py <span class="c-flag">--dry-run</span> <span class="c-flag">--count</span> <span class="c-num">5</span></pre>
-    </div>
-  </section>
-
-  <!-- INSTALL -->
-  <section id="install">
-    <p class="section-tag">// installation</p>
-    <h2>Get Running Fast</h2>
-    <p class="section-intro">Four steps to set up Pull Shark Automation on any platform.</p>
-
-    <div class="steps">
-      <div class="step">
-        <div class="step-num">01</div>
-        <div class="step-content">
-          <h4>Clone the Repository</h4>
-          <p>Run <code>git clone https://github.com/itxashancode/Pull-Shark-Automation.git</code> and enter the directory.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">02</div>
-        <div class="step-content">
-          <h4>Install Dependencies</h4>
-          <p>Run <code>pip install -r requirements.txt</code> — installs aiohttp, gitpython, requests, and more.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">03</div>
-        <div class="step-content">
-          <h4>Authenticate GitHub CLI</h4>
-          <p>Install <code>gh</code> CLI and run <code>gh auth login</code>. Add your personal access tokens to <code>github_tokens.json</code>.</p>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">04</div>
-        <div class="step-content">
-          <h4>Configure & Run</h4>
-          <p>Edit <code>config.json</code> with your repo path, PR count, and webhook URLs. Then run <code>python main.py</code>.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- CTA -->
-  <div class="cta-section">
-    <div class="cta-inner">
-      <span class="shark-icon" style="font-size:3rem;">🦈</span>
-      <h2>Ready to Automate?</h2>
-      <p>Star the repo, grab your tokens, and start earning Pull Shark badges today. Open source, MIT licensed, forever free.</p>
-      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="btn btn-primary">
-          View on GitHub ↗
+<!-- ════════ NAV ════════ -->
+<nav id="nav">
+  <div class="nav-in">
+    <a href="#" class="n-logo">
+      <div class="ldot"></div>
+      pull<span class="hi">_shark</span>
+    </a>
+    <ul class="n-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#badges">Badges</a></li>
+      <li><a href="#usage">Usage</a></li>
+      <li><a href="#install">Install</a></li>
+      <li>
+        <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="n-cta">
+          <i class="fa-brands fa-github"></i> GitHub
         </a>
-        <a href="https://github.com/itxashancode/Pull-Shark-Automation/stargazers" target="_blank" class="btn btn-outline">
+      </li>
+    </ul>
+    <button class="ham" id="ham" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</nav>
+
+<div class="mob-nav" id="mob">
+  <a href="#features" class="ml">Features</a>
+  <a href="#badges"   class="ml">Badges</a>
+  <a href="#usage"    class="ml">Usage</a>
+  <a href="#install"  class="ml">Install</a>
+  <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="btn btn-p n-cta">
+    <i class="fa-brands fa-github"></i> View on GitHub
+  </a>
+</div>
+
+<!-- ════════ HERO ════════ -->
+<section id="hero">
+  <div class="h-glow1"></div>
+  <div class="h-glow2"></div>
+
+  <div class="h-chip" data-aos="fade-down" data-aos-duration="600">
+    <div class="ldot"></div>
+    GitHub Automation Framework
+  </div>
+
+  <h1 class="h1" data-aos="fade-up" data-aos-duration="700" data-aos-delay="100">
+    <span class="l1">Automate Your</span>
+    <span class="l2"><span class="grad">Pull Shark</span> Badge</span>
+  </h1>
+
+  <p class="h-sub" data-aos="fade-up" data-aos-duration="700" data-aos-delay="200">
+    Create thousands of GitHub PRs at scale — intelligent token rotation, proxy support,
+    real-time notifications, and up to <strong>62 PRs/min</strong>.
+  </p>
+
+  <div class="h-btns" data-aos="fade-up" data-aos-duration="700" data-aos-delay="300">
+    <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="btn btn-p">
+      <i class="fa-brands fa-github"></i> Star on GitHub
+    </a>
+    <a href="#install" class="btn btn-g">
+      Quick Install <i class="fa-solid fa-arrow-down"></i>
+    </a>
+  </div>
+
+  <div class="h-tags" data-aos="fade-up" data-aos-duration="700" data-aos-delay="400">
+    <span class="tag"><i class="fa-brands fa-python"></i> Python 3.8+</span>
+    <span class="tag"><i class="fa-solid fa-bolt"></i> 62 PRs/min</span>
+    <span class="tag"><i class="fa-solid fa-scale-balanced"></i> MIT License</span>
+    <span class="tag"><i class="fa-brands fa-windows"></i> Windows</span>
+    <span class="tag"><i class="fa-brands fa-linux"></i> Linux</span>
+    <span class="tag"><i class="fa-brands fa-apple"></i> macOS</span>
+  </div>
+</section>
+
+<!-- ════════ STATS ════════ -->
+<div id="stats">
+  <div class="wrap">
+    <div class="stats-g">
+      <div class="s-item" data-aos="fade-up" data-aos-delay="0">
+        <span class="s-num" data-count="62">0</span>
+        <span class="s-lbl">PRs per Minute</span>
+      </div>
+      <div class="s-item" data-aos="fade-up" data-aos-delay="70">
+        <span class="s-num" data-count="3">0</span>
+        <span class="s-lbl">Token Slots</span>
+      </div>
+      <div class="s-item" data-aos="fade-up" data-aos-delay="140">
+        <span class="s-num" data-count="15" data-suffix="k">0</span>
+        <span class="s-lbl">API Req/Hour</span>
+      </div>
+      <div class="s-item" data-aos="fade-up" data-aos-delay="210">
+        <span class="s-num" data-count="4">0</span>
+        <span class="s-lbl">Badge Tiers</span>
+      </div>
+      <div class="s-item" data-aos="fade-up" data-aos-delay="280">
+        <span class="s-num">100%</span>
+        <span class="s-lbl">Open Source</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="div" />
+
+<!-- ════════ FEATURES ════════ -->
+<section id="features" class="sec">
+  <div class="wrap">
+    <p class="sec-tag" data-aos="fade-up">Capabilities</p>
+    <h2 class="sec-h" data-aos="fade-up" data-aos-delay="60">Everything You Need</h2>
+    <p class="sec-p" data-aos="fade-up" data-aos-delay="100">A complete Python automation framework built for scale — from your first 2 PRs to 1,024+ and beyond.</p>
+
+    <div class="feat-g">
+      <div class="f-card" data-aos="fade-up" data-aos-delay="0">
+        <div class="f-ico"><i class="fa-solid fa-bolt"></i></div>
+        <div class="f-title">Parallel Mode</div>
+        <div class="f-desc">Multi-threaded async engine processes up to 62 PRs/min with configurable concurrent workers. Built on asyncio for maximum throughput.</div>
+      </div>
+      <div class="f-card" data-aos="fade-up" data-aos-delay="60">
+        <div class="f-ico"><i class="fa-solid fa-rotate"></i></div>
+        <div class="f-title">Token Rotation</div>
+        <div class="f-desc">Automatically rotates between multiple GitHub tokens, sustaining 15,000+ API requests per hour without hitting rate limits.</div>
+      </div>
+      <div class="f-card" data-aos="fade-up" data-aos-delay="120">
+        <div class="f-ico"><i class="fa-solid fa-globe"></i></div>
+        <div class="f-title">Proxy Support</div>
+        <div class="f-desc">Built-in proxy scraping from 5+ sources, concurrent testing, latency-based sorting, and automatic rotation on failure.</div>
+      </div>
+      <div class="f-card" data-aos="fade-up" data-aos-delay="0">
+        <div class="f-ico"><i class="fa-solid fa-bell"></i></div>
+        <div class="f-title">Live Notifications</div>
+        <div class="f-desc">Discord and Slack webhooks deliver real-time progress updates, success confirmations, and error alerts as they happen.</div>
+      </div>
+      <div class="f-card" data-aos="fade-up" data-aos-delay="60">
+        <div class="f-ico"><i class="fa-solid fa-floppy-disk"></i></div>
+        <div class="f-title">State Persistence</div>
+        <div class="f-desc">Interrupted runs resume automatically from exactly where they stopped. Never lose progress due to network issues or restarts.</div>
+      </div>
+      <div class="f-card" data-aos="fade-up" data-aos-delay="120">
+        <div class="f-ico"><i class="fa-solid fa-vial"></i></div>
+        <div class="f-title">Dry Run Mode</div>
+        <div class="f-desc">Simulate the full automation pipeline end-to-end without making any real commits, pushes, or pull requests to GitHub.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="div" />
+
+<!-- ════════ BADGES ════════ -->
+<section id="badges" class="sec">
+  <div class="wrap">
+    <p class="sec-tag" data-aos="fade-up">Achievement Tiers</p>
+    <h2 class="sec-h" data-aos="fade-up" data-aos-delay="60">Earn Every Badge</h2>
+    <p class="sec-p" data-aos="fade-up" data-aos-delay="100">From Default to Gold — automate your way through every Pull Shark tier with ease.</p>
+
+    <div class="badge-g">
+      <div class="b-card def" data-aos="zoom-in" data-aos-delay="0">
+        <div class="b-glow"></div>
+        <div class="b-tier">Default</div>
+        <span class="b-emoji">🦈</span>
+        <div class="b-num">2</div>
+        <div class="b-unit">Pull Requests</div>
+      </div>
+      <div class="b-card bro" data-aos="zoom-in" data-aos-delay="80">
+        <div class="b-glow"></div>
+        <div class="b-tier">Bronze</div>
+        <span class="b-emoji">🥉</span>
+        <div class="b-num">16</div>
+        <div class="b-unit">Pull Requests</div>
+      </div>
+      <div class="b-card sil" data-aos="zoom-in" data-aos-delay="160">
+        <div class="b-glow"></div>
+        <div class="b-tier">Silver</div>
+        <span class="b-emoji">🥈</span>
+        <div class="b-num">128</div>
+        <div class="b-unit">Pull Requests</div>
+      </div>
+      <div class="b-card gol" data-aos="zoom-in" data-aos-delay="240">
+        <div class="b-glow"></div>
+        <div class="b-tier">Gold</div>
+        <span class="b-emoji">🏆</span>
+        <div class="b-num">1024</div>
+        <div class="b-unit">Pull Requests</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="div" />
+
+<!-- ════════ USAGE ════════ -->
+<section id="usage" class="sec">
+  <div class="wrap">
+    <p class="sec-tag" data-aos="fade-up">Quick Commands</p>
+    <h2 class="sec-h" data-aos="fade-up" data-aos-delay="60">Start in Seconds</h2>
+    <p class="sec-p" data-aos="fade-up" data-aos-delay="100">Three commands are all you need to go from zero to Pull Shark Gold.</p>
+
+    <div class="code-lay">
+      <div data-aos="fade-right" data-aos-delay="100">
+        <div class="c-tabs" id="ctabs">
+          <button class="c-tab on" data-p="seq">Sequential</button>
+          <button class="c-tab"    data-p="par">Parallel</button>
+          <button class="c-tab"    data-p="dry">Dry Run</button>
+        </div>
+        <div class="c-win">
+          <div class="c-bar">
+            <div class="dm dm-r"></div>
+            <div class="dm dm-y"></div>
+            <div class="dm dm-g"></div>
+            <span class="c-fname" id="cfn">main.py</span>
+          </div>
+          <div class="c-panel on" id="p-seq">
+            <pre><code class="language-bash"># Clone & install
+git clone https://github.com/itxashancode/Pull-Shark-Automation.git
+cd Pull-Shark-Automation
+pip install -r requirements.txt
+
+# Authenticate GitHub CLI
+gh auth login
+
+# Sequential mode — reliable, resumable
+python main.py --count 20 --delay 15</code></pre>
+          </div>
+          <div class="c-panel" id="p-par">
+            <pre><code class="language-bash"># Parallel mode — blazing fast
+python parallel_automation.py \
+  --count 1024 \
+  --concurrent 20
+
+# With proxy rotation enabled
+python parallel_automation.py \
+  --count 1024 \
+  --concurrent 20 \
+  --use-proxies</code></pre>
+          </div>
+          <div class="c-panel" id="p-dry">
+            <pre><code class="language-bash"># Simulate without any real commits
+python main.py --dry-run --count 5
+
+# Expected output:
+# 🔍 DRY RUN MODE — No commits
+# 🔹 PR #1 Simulation
+#   ✅ Simulation successful
+# 🔹 PR #2 Simulation
+#   ✅ Simulation successful</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-col" data-aos="fade-left" data-aos-delay="150">
+        <div class="i-card">
+          <div class="i-ico c"><i class="fa-solid fa-file-code"></i></div>
+          <div>
+            <h4>Sequential Mode</h4>
+            <p>Single-threaded, reliable, and fully resumable. Perfect for small batches under 500 PRs with full control over pacing.</p>
+          </div>
+        </div>
+        <div class="i-card">
+          <div class="i-ico g"><i class="fa-solid fa-gauge-high"></i></div>
+          <div>
+            <h4>Parallel Mode</h4>
+            <p>Async multi-worker engine hitting up to 62 PRs/min. Ideal for large batches (500–10,000 PRs) with multiple tokens.</p>
+          </div>
+        </div>
+        <div class="i-card">
+          <div class="i-ico gd"><i class="fa-solid fa-shield-halved"></i></div>
+          <div>
+            <h4>Dry Run</h4>
+            <p>Validate tokens, proxies, and webhooks without touching your repo or consuming GitHub API quota.</p>
+          </div>
+        </div>
+        <a href="https://github.com/itxashancode/Pull-Shark-Automation#-usage" target="_blank" class="btn btn-g" style="justify-content:center;">
+          Full Documentation <i class="fa-solid fa-arrow-up-right-from-square"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="div" />
+
+<!-- ════════ INSTALL ════════ -->
+<section id="install" class="sec">
+  <div class="wrap">
+    <p class="sec-tag" data-aos="fade-up">Installation</p>
+    <h2 class="sec-h" data-aos="fade-up" data-aos-delay="60">Get Running Fast</h2>
+    <p class="sec-p" data-aos="fade-up" data-aos-delay="100">Four steps to set up Pull Shark Automation on any platform.</p>
+
+    <div class="inst-lay">
+      <div class="steps" data-aos="fade-right" data-aos-delay="100">
+        <div class="step on" id="st1">
+          <div class="sn">01</div>
+          <div class="sb">
+            <h4>Clone the Repository</h4>
+            <p>Run <code>git clone https://github.com/itxashancode/Pull-Shark-Automation.git</code> and navigate into the directory.</p>
+          </div>
+        </div>
+        <div class="step" id="st2">
+          <div class="sn">02</div>
+          <div class="sb">
+            <h4>Install Dependencies</h4>
+            <p>Run <code>pip install -r requirements.txt</code> — installs aiohttp, gitpython, requests, colorama, and more.</p>
+          </div>
+        </div>
+        <div class="step" id="st3">
+          <div class="sn">03</div>
+          <div class="sb">
+            <h4>Authenticate GitHub CLI</h4>
+            <p>Install <code>gh</code> and run <code>gh auth login</code>. Add personal access tokens to <code>github_tokens.json</code>.</p>
+          </div>
+        </div>
+        <div class="step" id="st4">
+          <div class="sn">04</div>
+          <div class="sb">
+            <h4>Configure & Run</h4>
+            <p>Edit <code>config.json</code> with your repo path, PR count, and optional webhook URLs. Run <code>python main.py</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div data-aos="fade-left" data-aos-delay="150">
+        <div class="req-card">
+          <div class="req-hd">
+            <i class="fa-solid fa-list-check"></i>
+            <h3>Requirements</h3>
+          </div>
+          <ul class="req-list">
+            <li class="req-row"><span class="req-name"><i class="fa-brands fa-python"></i> Python</span><span class="rbadge">3.8+</span></li>
+            <li class="req-row"><span class="req-name"><i class="fa-brands fa-git-alt"></i> Git</span><span class="rbadge">2.0+</span></li>
+            <li class="req-row"><span class="req-name"><i class="fa-brands fa-github"></i> GitHub CLI</span><span class="rbadge">Required</span></li>
+            <li class="req-row"><span class="req-name"><i class="fa-solid fa-key"></i> GitHub Token</span><span class="rbadge">Write Access</span></li>
+            <li class="req-row"><span class="req-name"><i class="fa-solid fa-microchip"></i> RAM</span><span class="rbadge">4 GB+</span></li>
+            <li class="req-row"><span class="req-name"><i class="fa-solid fa-display"></i> Platform</span><span class="rbadge">All Platforms</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════ CTA ════════ -->
+<section id="cta">
+  <div class="wrap">
+    <div class="cta-box" data-aos="zoom-in" data-aos-duration="600">
+      <span class="cta-shark">🦈</span>
+      <h2>Ready to <span class="grad">Automate?</span></h2>
+      <p>Star the repo, configure your tokens, and start earning Pull Shark badges today.<br/>Open source, MIT licensed, forever free.</p>
+      <div class="cta-acts">
+        <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank" class="btn btn-p">
+          <i class="fa-brands fa-github"></i> View on GitHub
+        </a>
+        <a href="https://github.com/itxashancode/Pull-Shark-Automation/stargazers" target="_blank" class="btn btn-gold">
           ⭐ Star the Project
         </a>
       </div>
     </div>
   </div>
+</section>
 
-  <!-- FOOTER -->
-  <footer>
-    <span>© 2026 itxashancode · Pull Shark Automation</span>
-    <div class="footer-links">
-      <a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank">GitHub</a>
-      <a href="https://github.com/itxashancode/Pull-Shark-Automation/issues" target="_blank">Issues</a>
-      <a href="https://github.com/itxashancode/Pull-Shark-Automation/blob/main/LICENSE" target="_blank">License</a>
+<!-- ════════ FOOTER ════════ -->
+<footer>
+  <div class="wrap">
+    <div class="ft-main">
+      <div class="ft-brand">
+        <h3>🦈 pull_shark</h3>
+        <p>A Python automation framework for GitHub PR workflows. Earn every Pull Shark badge with minimal effort.</p>
+      </div>
+      <div class="ft-col">
+        <h4>Project</h4>
+        <ul>
+          <li><a href="https://github.com/itxashancode/Pull-Shark-Automation" target="_blank"><i class="fa-brands fa-github"></i> Repository</a></li>
+          <li><a href="https://github.com/itxashancode/Pull-Shark-Automation/blob/main/README.md" target="_blank"><i class="fa-solid fa-book"></i> Documentation</a></li>
+          <li><a href="https://github.com/itxashancode/Pull-Shark-Automation/issues" target="_blank"><i class="fa-solid fa-circle-exclamation"></i> Issues</a></li>
+          <li><a href="https://github.com/itxashancode/Pull-Shark-Automation/blob/main/LICENSE" target="_blank"><i class="fa-solid fa-scale-balanced"></i> MIT License</a></li>
+        </ul>
+      </div>
+      <div class="ft-col">
+        <h4>Quick Links</h4>
+        <ul>
+          <li><a href="#features"><i class="fa-solid fa-bolt"></i> Features</a></li>
+          <li><a href="#badges"><i class="fa-solid fa-trophy"></i> Badges</a></li>
+          <li><a href="#usage"><i class="fa-solid fa-terminal"></i> Usage</a></li>
+          <li><a href="#install"><i class="fa-solid fa-download"></i> Install</a></li>
+        </ul>
+      </div>
     </div>
-  </footer>
+    <div class="ft-bot">
+      <span>© 2026 itxashancode · Pull Shark Automation</span>
+      <div class="ft-soc">
+        <a href="https://github.com/itxashancode" target="_blank" class="soc-a" data-tippy-content="GitHub Profile" data-tippy-theme="sh">
+          <i class="fa-brands fa-github"></i>
+        </a>
+        <a href="https://linktr.ee/itxashanvibes" target="_blank" class="soc-a" data-tippy-content="Linktree" data-tippy-theme="sh">
+          <i class="fa-solid fa-link"></i>
+        </a>
+      </div>
+    </div>
+  </div>
+</footer>
 
+<button id="stb" aria-label="Scroll to top"><i class="fa-solid fa-arrow-up"></i></button>
+
+<!-- ═══════════════ SCRIPTS ═══════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/aos/2.3.4/aos.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/2.11.8/umd/popper.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tippy.js/6.3.7/tippy-bundle.umd.min.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+  /* ── AOS ── */
+  AOS.init({ duration: 650, easing: 'ease-out-cubic', once: true, offset: 55 });
+
+  /* ── Highlight.js ── */
+  document.querySelectorAll('pre code').forEach(el => hljs.highlightElement(el));
+
+  /* ── Tippy ── */
+  tippy('[data-tippy-content]', { theme: 'sh', placement: 'top', arrow: true });
+
+  /* ═══ CANVAS PARTICLES ═══ */
+  const cnv = document.getElementById('cnv');
+  const ctx = cnv.getContext('2d');
+  let W, H, pts = [];
+
+  function resize() { W = cnv.width = window.innerWidth; H = cnv.height = window.innerHeight; }
+  resize();
+  window.addEventListener('resize', resize, { passive: true });
+
+  const COUNT = Math.min(55, Math.floor(window.innerWidth / 22));
+
+  class P {
+    constructor() { this.init(true); }
+    init(first) {
+      this.x  = Math.random() * W;
+      this.y  = first ? Math.random() * H : H + 8;
+      this.vx = (Math.random() - .5) * .28;
+      this.vy = -(Math.random() * .38 + .1);
+      this.r  = Math.random() * 1.1 + .3;
+      this.a  = Math.random() * .32 + .05;
+      this.cl = Math.random() > .5 ? '0,195,255' : '0,255,170';
+    }
+    tick() { this.x += this.vx; this.y += this.vy; if (this.y < -8) this.init(false); }
+    draw() {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${this.cl},${this.a})`;
+      ctx.fill();
+    }
+  }
+
+  for (let i = 0; i < COUNT; i++) pts.push(new P());
+
+  (function loop() {
+    ctx.clearRect(0, 0, W, H);
+    pts.forEach(p => { p.tick(); p.draw(); });
+    requestAnimationFrame(loop);
+  })();
+
+  /* ═══ GSAP HERO ═══ */
+  gsap.from('.h-chip',   { y: 18, opacity: 0, duration: .65, ease: 'power3.out', delay: .1 });
+  gsap.from('.h1',       { y: 32, opacity: 0, duration: .75, ease: 'power3.out', delay: .22 });
+  gsap.from('.h-sub',    { y: 22, opacity: 0, duration: .65, ease: 'power3.out', delay: .38 });
+  gsap.from('.h-btns',   { y: 18, opacity: 0, duration: .65, ease: 'power3.out', delay: .52 });
+  gsap.from('.h-tags',   { y: 14, opacity: 0, duration: .65, ease: 'power3.out', delay: .64 });
+
+  /* ═══ COUNTER ═══ */
+  let counted = false;
+  const counters = document.querySelectorAll('[data-count]');
+
+  function runCount() {
+    if (counted) return;
+    const r = document.getElementById('stats').getBoundingClientRect();
+    if (r.top < window.innerHeight - 70) {
+      counted = true;
+      counters.forEach(el => {
+        const end = parseInt(el.dataset.count);
+        const sfx = el.dataset.suffix || '';
+        gsap.fromTo(el,
+          { innerText: 0 },
+          {
+            innerText: end, duration: 1.75, ease: 'power2.out',
+            snap: { innerText: 1 },
+            onUpdate() { el.textContent = Math.round(parseFloat(this.targets()[0].innerText)) + sfx; }
+          }
+        );
+      });
+    }
+  }
+
+  window.addEventListener('scroll', runCount, { passive: true });
+  runCount();
+
+  /* ═══ NAV SCROLL ═══ */
+  const nav  = document.getElementById('nav');
+  const prog = document.getElementById('prog');
+  const stb  = document.getElementById('stb');
+  const dH   = () => document.documentElement.scrollHeight - window.innerHeight;
+
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    nav.classList.toggle('scrolled', y > 16);
+    prog.style.width = Math.min((y / dH()) * 100, 100) + '%';
+    stb.classList.toggle('vis', y > 380);
+  }, { passive: true });
+
+  stb.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+
+  /* ═══ MOBILE NAV ═══ */
+  const ham = document.getElementById('ham');
+  const mob = document.getElementById('mob');
+
+  ham.addEventListener('click', () => {
+    const open = mob.classList.toggle('on');
+    ham.classList.toggle('on', open);
+    document.body.style.overflow = open ? 'hidden' : '';
+  });
+
+  document.querySelectorAll('.ml').forEach(a => {
+    a.addEventListener('click', () => {
+      mob.classList.remove('on');
+      ham.classList.remove('on');
+      document.body.style.overflow = '';
+    });
+  });
+
+  /* ═══ CODE TABS ═══ */
+  const fnames = { seq: 'main.py', par: 'parallel_automation.py', dry: 'main.py --dry-run' };
+
+  document.querySelectorAll('.c-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const p = tab.dataset.p;
+      document.querySelectorAll('.c-tab').forEach(t => t.classList.remove('on'));
+      document.querySelectorAll('.c-panel').forEach(x => x.classList.remove('on'));
+      tab.classList.add('on');
+      document.getElementById('p-' + p).classList.add('on');
+      document.getElementById('cfn').textContent = fnames[p];
+    });
+  });
+
+  /* ═══ INSTALL STEPS ═══ */
+  document.querySelectorAll('.step').forEach(s => {
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.step').forEach(x => x.classList.remove('on'));
+      s.classList.add('on');
+    });
+  });
+
+});
+</script>
 </body>
 </html>
