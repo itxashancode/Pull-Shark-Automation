@@ -1,12 +1,12 @@
 {
   "tokens": [
     {
-      "name": "Pull Reuqest",
-      "token": ""
+      "name": "your_github_username",
+      "token": "your_github_token"
     },
     {
-      "name": "Pull Request 2", 
-      "token": ""
+      "name": "your_github_username",
+      "token": "your_github_token"
     }
   ]
 }

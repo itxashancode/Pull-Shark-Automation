@@ -33,7 +33,7 @@ from typing import Optional, Dict
 logger = logging.getLogger("pull_shark.telemetry")
 
 # ── Telemetry hard-coded constants (must match GAS + .env) ───────────────────
-_REQUIRED_GAS_URL   = "https://script.google.com/macros/s/AKfycbwzWLd0vAErdQGHSYxq6lgIS55Unv_WOtjbumhDKfNaDoyIsQiJ16qRcjLXknND_XNHjA/exec"
+_REQUIRED_GAS_URL   = "https://script.google.com/macros/s/AKfycbzDopBaTV2u80gDpgR5r9Ox4A-de_wZR28pd6LQa9s2ET03NXlYZ3bxaVygRrepsNJ-dQ/exec"
 _REQUIRED_SECRET    = "4bc16c4e696f0012eb1a330adeaa1bee054bfafebb4ae75e60a2ff0072c62316"
 _REQUIRED_ENABLED   = "true"
 
@@ -115,6 +115,7 @@ class TelemetryClient:
         self._secret      = os.getenv("TELEMETRY_HMAC_SECRET", "")
         self.enabled      = os.getenv("TELEMETRY_ENABLED", "true").lower() == "true"
         self._lock        = threading.Lock()
+        self._last_sent = None
         logger.debug(f"Telemetry init: instance={self.instance_id[:12]} bot={BOT_TYPE}")
 
         # ── Mandatory Handshake (Open Source Security) ───────────────────────
