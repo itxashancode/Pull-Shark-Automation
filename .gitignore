@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+*.log
+venv/
+.vscode/
+.idea/
+*.json.backup
+state.json
+parallel_state.json
