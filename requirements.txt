@@ -9,3 +9,5 @@ schedule>=1.2.0
 asyncio>=3.4.3
 aiodns>=3.0.0
 colorama>=0.4.6
+rich>=13.0.0
+python-dotenv>=1.0.0
