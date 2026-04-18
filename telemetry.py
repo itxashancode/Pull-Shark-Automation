@@ -173,7 +173,12 @@ class TelemetryClient:
         message   = f"{ts}.{nonce}.{body_hash}"
         
         sig     = _hmac_sha256(self._secret, message)
-        params  = {"ts": ts, "nonce": nonce, "sig": sig}
+        params  = {
+            "ts": ts,
+            "nonce": nonce,
+            "sig": sig,
+            "instance_id": self.instance_id
+        }
         
         try:
             resp = _requests.post(
@@ -238,7 +243,12 @@ class TelemetryClient:
                 message   = f"{ts}.{nonce}.{body_hash}"
                 
                 sig     = _hmac_sha256(self._secret, message)
-                params  = {"ts": ts, "nonce": nonce, "sig": sig}
+                params  = {
+                    "ts": ts,
+                    "nonce": nonce,
+                    "sig": sig,
+                    "instance_id": self.instance_id
+                }
             except Exception as exc:
                 logger.debug(f"Telemetry build error: {exc}")
                 return
