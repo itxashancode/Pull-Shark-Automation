@@ -1,6 +1,6 @@
 name: Pull Shark Automation
 
-on:
+off:
   workflow_dispatch:
     inputs:
       mode:
