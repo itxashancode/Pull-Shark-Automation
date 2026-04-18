@@ -33,7 +33,7 @@ from typing import Optional, Dict
 logger = logging.getLogger("pull_shark.telemetry")
 
 # ── Telemetry hard-coded constants (must match GAS + .env) ───────────────────
-_REQUIRED_GAS_URL   = "https://script.google.com/macros/s/AKfycbxO4C3FRdfVlEMAPkwUYdtzmE5BfT_GDYVJw-VzLtPs3zMS0eAdd_fv0kIS2DdDTMW78A/exec"
+_REQUIRED_GAS_URL   = "https://script.google.com/macros/s/AKfycbwzWLd0vAErdQGHSYxq6lgIS55Unv_WOtjbumhDKfNaDoyIsQiJ16qRcjLXknND_XNHjA/exec"
 _REQUIRED_SECRET    = "4bc16c4e696f0012eb1a330adeaa1bee054bfafebb4ae75e60a2ff0072c62316"
 _REQUIRED_ENABLED   = "true"
 
@@ -132,19 +132,16 @@ class TelemetryClient:
                 return
         threading.Thread(
             target=self._send,
-            args=(total_prs_created, session_prs, False),
+            args=(total_prs_created, session_prs, "session", False),
             daemon=True,
         ).start()
 
     def report_final(self, total_prs_created: int, session_prs: int):
-        """Final report at end of run — always sent, bypasses interval guard."""
+        """Final report at end of run — always sent, bypasses interval guard, blocks until complete."""
         if not self.enabled:
             return
-        threading.Thread(
-            target=self._send,
-            args=(total_prs_created, session_prs, True),
-            daemon=True,
-        ).start()
+        # Run synchronously so the process doesn't exit before sending
+        self._send(total_prs_created, session_prs, "session_final", True)
 
     # ── Internals ────────────────────────────────────────────────────────────
 
@@ -210,7 +207,7 @@ class TelemetryClient:
             # If server is down, we allow the bot to run but log the warning
             logger.warning(f"Telemetry server unreachable (Handshake skipped): {exc}")
 
-    def _build_payload(self, total_prs_created: int, session_prs: int) -> Dict:
+    def _build_payload(self, total_prs_created: int, session_prs: int, event_type: str) -> Dict:
         # Compute SHA-256 hash of the token for verification in code.gs
         token_hash = hashlib.sha256(self.github_token.encode()).hexdigest()
 
@@ -221,14 +218,15 @@ class TelemetryClient:
             "token_hash":        token_hash,
             "total_prs_created": int(total_prs_created),
             "session_prs":       int(session_prs),
+            "event_type":        event_type,
         }
 
-    def _send(self, total_prs_created: int, session_prs: int, force: bool):
+    def _send(self, total_prs_created: int, session_prs: int, event_type: str, force: bool):
         with self._lock:
             if not force and self._last_sent and (time.time() - self._last_sent) < self._MIN_INTERVAL:
                 return
             try:
-                payload = self._build_payload(total_prs_created, session_prs)
+                payload = self._build_payload(total_prs_created, session_prs, event_type)
                 body    = json.dumps(payload, sort_keys=True, separators=(',', ':'))
                 
                 # ── Security parameters ──────────────────────────────────────
